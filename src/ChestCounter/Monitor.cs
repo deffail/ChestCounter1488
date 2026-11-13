@@ -3,7 +3,10 @@ using System.Runtime.Versioning;
 namespace ChestCounter;
 
 /// <summary>Lo que muestra la ventana.</summary>
-public sealed record MonitorState(OverlayView View, IReadOnlyList<Profile> Profiles, string? CurrentKey, string? Notice, bool AutoCloseOffer, ChestStats Stats);
+public sealed record MonitorState(OverlayView View, IReadOnlyList<Profile> Profiles, string? CurrentKey, string? Notice, bool AutoCloseOffer, ChestStats Stats)
+{
+    public DesktopStats Desktop { get; init; } = DesktopStats.Empty;
+}
 
 /// <summary>Estadísticas del perfil mostrado (la partida en curso cuenta ya en hoy y en la mejor partida).</summary>
 /// <param name="Today">Cofres de hoy.</param>
@@ -166,7 +169,12 @@ public sealed class Monitor
     /// <summary>Guarda el estimado de cofres de antes para el perfil mostrado y rehace el informe.</summary>
     public void SetInitialChests(int count)
     {
-        var key = _shownKey ?? "";
+        SetInitialChests(count, _shownKey);
+    }
+
+    public void SetInitialChests(int count, string? profileKey)
+    {
+        var key = profileKey ?? "";
         Change(c =>
         {
             if (count > 0)
@@ -298,7 +306,26 @@ public sealed class Monitor
         var shown = Profiles.Current(_data, _config);
         _shownKey = shown?.Key;
         _shownName = shown?.Name;
-        var view = OverlayModel.Build(Profiles.View(_data, _config), _tracker.LiveMatch, _tracker.IsLive, Profiles.InitialChests(_data, _config));
+        if (shown != null)
+        {
+            lock (_cfgGate)
+            {
+                if (_config.ClaimedRewards.Remove("", out var claimed))
+                {
+                    if (!_config.ClaimedRewards.TryGetValue(shown.Key, out var existing))
+                        _config.ClaimedRewards[shown.Key] = claimed;
+                    else
+                        _config.ClaimedRewards[shown.Key] = existing.Union(claimed).ToList();
+                    SaveQuietly();
+                }
+            }
+        }
+        var profileData = Profiles.View(_data, _config);
+        var live = _tracker.LiveMatch;
+        if (live != null && shown != null && Profiles.Key(live) != shown.Key) live = null;
+        var inProgress = _tracker.IsLive && (_tracker.LiveMatch == null || live != null);
+        var initial = Profiles.InitialChests(_data, _config);
+        var view = OverlayModel.Build(profileData, live, inProgress, initial);
         ReportWriter.WriteOverlay(_store, view);
         ObsServer.Update(view);
         if (OperatingSystem.IsWindows() && NativeOverlay.IsRunning)
@@ -307,7 +334,10 @@ public sealed class Monitor
         }
 
         var notice = _notice ?? (_autoCloseAt != null ? L.T("Fortnite закрыт: счётчик закроется через 30 с.", "Fortnite is closed: the counter closes in 30 s.") : null);
-        var state = new MonitorState(view, Profiles.List(_data), Profiles.Current(_data, _config)?.Key, notice, _autoCloseAt != null, BuildStats());
+        var state = new MonitorState(view, Profiles.List(_data), shown?.Key, notice, _autoCloseAt != null, BuildStats())
+        {
+            Desktop = DesktopStats.Build(profileData.Matches, live, initial),
+        };
         Changed?.Invoke(state);
     }
 
@@ -322,6 +352,7 @@ public sealed class Monitor
             .Take(100)
             .ToList();
         var live = _tracker.IsLive ? _tracker.LiveMatch : null;
+        if (live != null && _shownKey != null && Profiles.Key(live) != _shownKey) live = null;
         var today = DateTime.Now.Date;
 
         var perDay = new Dictionary<DateTime, int>();

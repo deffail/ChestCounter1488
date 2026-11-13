@@ -32,6 +32,7 @@ public sealed class MainForm : Form
     private readonly DailyChart _daily;
     private readonly Label _lastValue, _lastDetail;
     private MonitorState? _last;
+    private StatsForm? _statsForm;
     private string? _profileSig;
     private bool _ignoreProfileChange;
     private bool _autoCloseOffer;
@@ -129,8 +130,14 @@ public sealed class MainForm : Form
         // Botones de acción.
         _overlayButton = Action(L.T("Оверлей", "Overlay"), RightX);
         _overlayButton.Click += (_, _) => _monitor.ToggleOverlay();
-        _reportButton = Action(L.T("Отчёт", "Report"), RightX + 95);
-        _reportButton.Click += (_, _) => Open(_store.ReportPath);
+        _reportButton = Action(L.T("Статистика", "Stats"), RightX + 95);
+        _reportButton.Click += (_, _) =>
+        {
+            if (_statsForm == null || _statsForm.IsDisposed)
+                _statsForm = new StatsForm(_monitor, _store, _last);
+            _statsForm.Show(this);
+            _statsForm.Activate();
+        };
         _settingsButton = Action(L.T("Настройки", "Settings"), RightX + 190);
         _settingsButton.Click += (_, _) =>
         {

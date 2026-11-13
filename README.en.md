@@ -1,3 +1,5 @@
+**Note:** The latest statistics window and reward calculator are documented in the [Russian README](README.md). The release links below may refer to an older build.
+
 [Русский](README.md) · **English**
 
 # Fortnite Chest Counter

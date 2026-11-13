@@ -75,6 +75,12 @@ public sealed class MatchRecord
 
 public sealed class Config
 {
+    // Calculator assumptions, not verified Fortnite odds.
+    public int DropOneIn { get; set; } = 2000;
+    public int DropNextChests { get; set; } = 100;
+    public string SelectedReward { get; set; } = "pickaxe";
+    public Dictionary<string, int> RewardOdds { get; set; } = new();
+    public Dictionary<string, List<string>> ClaimedRewards { get; set; } = new();
     /// <summary>Interface language chosen in the settings: "ru", "en", or null (follow Windows).</summary>
     public string? Language { get; set; }
 
